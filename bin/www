@@ -1,0 +1,148 @@
+#!/usr/bin/env node
+
+/**
+ * Module dependencies.
+ */
+
+var app = require('../app');
+var debug = require('debug')('myopenhab-personal:server');
+var http = require('http');
+var https = require('https');
+var fs = require('fs');
+var logger = require('../logger');
+
+var config = require('../config.json');
+
+logger.info('my.openHAB personal edition starting for ' + config.hostname);
+
+/**
+ * Get port from environment and store in Express.
+ */
+
+var port = normalizePort(process.env.PORT || config.httpPort);
+var sport = normalizePort(process.env.SPORT || config.httpsPort);
+app.set('port', port);
+app.set('sport', sport);
+
+/*
+  Check if user changed the default hostname
+ */
+
+if (config.hostname == 'please.put.your.hostname') {
+  logger.error('Please configure your hostname in config.json file');
+  process.exit(1);
+}
+
+/*
+  Check if user changed the default uuid and secret
+ */
+if (config.uuid == 'put-yours-here' || config.secret == 'put-yours-here') {
+  logger.error('Please configure your uuid and secret in config.json file');
+  process.exit(1);
+}
+
+/*
+    Check if certificate files exist
+ */
+
+if (config.enableHttps && (!fs.existsSync(config.keyFile) || !fs.existsSync(config.certFile))) {
+  logger.info('No certificate files found, please install certificate and key or switch off https');
+  process.exit(1);
+}
+
+/**
+ * Socket.io
+ */
+
+var io = app.io;
+
+/*
+    Launch HTTP server if configured
+ */
+
+if (config.enableHttp) {
+  logger.info('Starting http server');
+  var server = http.createServer(app);
+  io.attach(server);
+  server.listen(port);
+  server.on('error', onError);
+  server.on('listening', onListening);
+
+}
+
+/*
+    Launch HTTPS server if configured
+ */
+if (config.enableHttps) {
+  logger.info('Starting https server');
+  var secureServer = https.createServer({
+    key: fs.readFileSync('../tls/key.pem'),
+    cert: fs.readFileSync('../tls/cert.pem')
+  }, app);
+  io.attach(secureServer);
+  secureServer.listen(sport);
+  secureServer.on('error', onError);
+  secureServer.on('listening', onListening);
+} else {
+  logger.warn('It is higly recommended to use HTTPS to encrypt your communications with openHAB!');
+}
+
+/**
+ * Normalize a port into a number, string, or false.
+ */
+
+function normalizePort(val) {
+  var port = parseInt(val, 10);
+
+  if (isNaN(port)) {
+    // named pipe
+    return val;
+  }
+
+  if (port >= 0) {
+    // port number
+    return port;
+  }
+
+  return false;
+}
+
+/**
+ * Event listener for HTTP server "error" event.
+ */
+
+function onError(error) {
+  if (error.syscall !== 'listen') {
+    throw error;
+  }
+
+  var bind = typeof port === 'string'
+    ? 'Pipe ' + port
+    : 'Port ' + port;
+
+  // handle specific listen errors with friendly messages
+  switch (error.code) {
+    case 'EACCES':
+      console.error(bind + ' requires elevated privileges');
+      process.exit(1);
+      break;
+    case 'EADDRINUSE':
+      console.error(bind + ' is already in use');
+      process.exit(1);
+      break;
+    default:
+      throw error;
+  }
+}
+
+/**
+ * Event listener for HTTP server "listening" event.
+ */
+
+function onListening() {
+  var addr = server.address();
+  var bind = typeof addr === 'string'
+    ? 'pipe ' + addr
+    : 'port ' + addr.port;
+  logger.info('Listening on ' + bind);
+}

@@ -1,0 +1,12 @@
+{
+  "hostname": "please.put.your.hostname",
+  "httpPort": 3000,
+  "httpsPort": 3443,
+  "enableHttp": false,
+  "enableHttps": true,
+  "enableAuth": true,
+  "keyFile": "../tls/key.pem",
+  "certFile": "../tls/cert.pem",
+  "uuid": "put-yours-here",
+  "secret": "put-yours-here"
+}
